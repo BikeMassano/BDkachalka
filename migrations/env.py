@@ -11,7 +11,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option('sqlalchemy.url', 'sqlite:///kachalka.db')
+config.set_main_option('sqlalchemy.url', "postgresql://postgres:123@localhost:5433/kachalka")
 
 print("Base:", Base)
 target_metadata = Base.metadata

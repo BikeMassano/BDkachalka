@@ -1,4 +1,4 @@
-import sqlite3
+import psycopg2
 
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 
 # ORM настройка
 # В будущем переделать под PostgreSQL или MSSql
-engine = create_engine('sqlite:///kachalka.db')
+engine = create_engine("postgresql://postgres:123@localhost:5433/kachalka")
 
 Base = declarative_base()
 
@@ -15,7 +15,7 @@ Session = sessionmaker(bind=engine)
 session = Session()
 
 # Подключение к базе данных
-conn = sqlite3.connect('kachalka.db')
+conn = psycopg2.connect("postgresql://postgres:123@localhost:5433/kachalka")
 cursor = conn.cursor()
 
 # Модели для ORM
@@ -244,48 +244,48 @@ class RoomManagementORM(RoomManagementBase):
 # Реализации интерфейсов с решением поставленных задач через DB API 2.0
 class TrainerManagementDBAPI(TrainerManagementBase):
     def add_trainer(self, name, specialization, experience_years, room_id):
-        query = "INSERT INTO trainers (name, specialization, experience_years, room_id) VALUES (?, ?, ?, ?)"
+        query = "INSERT INTO trainers (name, specialization, experience_years, room_id) VALUES (%s, %s, %s, %s)"
         cursor.execute(query, (name, specialization, experience_years, room_id))
         conn.commit()
 
     def update_trainer_room(self, trainer_id, new_room_id):
-        query = "UPDATE trainers SET room_id = ? WHERE id = ?"
+        query = "UPDATE trainers SET room_id = %s WHERE id = %s"
         cursor.execute(query, (new_room_id, trainer_id))
         conn.commit()
 
     def update_trainer_spec(self, trainer_id, new_specialization):
-        query = "UPDATE trainers SET specialization = ? WHERE id = ?"
+        query = "UPDATE trainers SET specialization = %s WHERE id = %s"
         cursor.execute(query, (new_specialization, trainer_id))
         conn.commit()
 
     def delete_trainer(self, trainer_id):
-        query = "DELETE FROM trainers WHERE id = ?"
+        query = "DELETE FROM trainers WHERE id = %s"
         cursor.execute(query, (trainer_id,))
         conn.commit()
 
     def select_trainers_by_room(self, room_id):
-        query = "SELECT * FROM trainers WHERE room_id = ?"
+        query = "SELECT * FROM trainers WHERE room_id = %s"
         cursor.execute(query, (room_id,))
         return cursor.fetchall()
 
 class EquipmentManagementDBAPI(EquipmentManagementBase):
     def add_equipment(self, name, type, quantity):
-        query = "INSERT INTO equipment (name, type, quantity) VALUES (?, ?, ?)"
+        query = "INSERT INTO equipment (name, type, quantity) VALUES (%s, %s, %s)"
         cursor.execute(query, (name, type, quantity))
         conn.commit()
 
     def add_equipment_to_trainer(self, trainer_id, equipment_id, quantity):
         # Check if entry exists
-        query_check = "SELECT quantity FROM trainer_equipment WHERE trainer_id = ? AND equipment_id = ?"
+        query_check = "SELECT quantity FROM trainer_equipment WHERE trainer_id = %s AND equipment_id = %s"
         cursor.execute(query_check, (trainer_id, equipment_id))
         existing_entry = cursor.fetchone()
 
         if existing_entry:
             new_quantity = existing_entry[0] + quantity
-            query = "UPDATE trainer_equipment SET quantity = ? WHERE trainer_id = ? AND equipment_id = ?"
+            query = "UPDATE trainer_equipment SET quantity = %s WHERE trainer_id = %s AND equipment_id = %s"
             cursor.execute(query, (new_quantity, trainer_id, equipment_id))
         else:
-            query = "INSERT INTO trainer_equipment (trainer_id, equipment_id, quantity) VALUES (?, ?, ?)"
+            query = "INSERT INTO trainer_equipment (trainer_id, equipment_id, quantity) VALUES (%s, %s, %s)"
             cursor.execute(query, (trainer_id, equipment_id, quantity))
         conn.commit()
 
@@ -295,7 +295,7 @@ class EquipmentManagementDBAPI(EquipmentManagementBase):
             SELECT e.name, te.quantity
             FROM trainer_equipment te
             JOIN equipment e ON te.equipment_id = e.id
-            WHERE te.trainer_id = ?
+            WHERE te.trainer_id = %s
         """
         cursor.execute(query, (trainer_id,))
         results = cursor.fetchall()
@@ -317,12 +317,12 @@ class EquipmentManagementDBAPI(EquipmentManagementBase):
 
 class RoomManagementDBAPI(RoomManagementBase):
     def add_room(self, name, location, capacity):
-        query = "INSERT INTO rooms (name, location, capacity) VALUES (?, ?, ?)"
+        query = "INSERT INTO rooms (name, location, capacity) VALUES (%s, %s, %s)"
         cursor.execute(query, (name, location, capacity))
         conn.commit()
 
     def delete_room(self, room_id):
-        query = "DELETE FROM rooms WHERE id = ?"
+        query = "DELETE FROM rooms WHERE id = %s"
         cursor.execute(query, (room_id,))
         conn.commit()
 
@@ -371,7 +371,6 @@ def create_test_data(trainer_manager_orm, equipment_manager_orm, room_manager_or
     equipment_manager_dbapi.add_equipment_to_trainer(1, 5, 5)
 
 if __name__ == '__main__':
-    pass
     # Создание базы данных и таблиц, если они не существуют.
     # Для первоначальной настройки. Alembic обрабатывает последующие изменения.
     # Base.metadata.create_all(engine)
@@ -386,7 +385,7 @@ if __name__ == '__main__':
 
     try:
         # # Проверка методов добавления записей в таблицы (тренеров, оборудования, залов)
-        # create_test_data(trainer_manager_orm, equipment_manager_orm, room_manager_orm, trainer_manager_dbapi, equipment_manager_dbapi, room_manager_dbapi)
+        create_test_data(trainer_manager_orm, equipment_manager_orm, room_manager_orm, trainer_manager_dbapi, equipment_manager_dbapi, room_manager_dbapi)
         # print("Данные занесены в базу данных!")
 
         # # Проверка методов выборки тренеров в определённом зале
@@ -427,10 +426,10 @@ if __name__ == '__main__':
         # room_manager_dbapi.delete_room(4)
 
         # Тест метода вычисления общего кол-ва оборудования, используемого каждым тренером
-        equipment_data = equipment_manager_dbapi.calculate_all_trainer_equipment()
-        print(equipment_data)
-        equipment_data = equipment_manager_orm.calculate_all_trainer_equipment()
-        print(equipment_data)
+        # equipment_data = equipment_manager_dbapi.calculate_all_trainer_equipment()
+        # print(equipment_data)
+        # equipment_data = equipment_manager_orm.calculate_all_trainer_equipment()
+        # print(equipment_data)
     except Exception as e:
         print(e)
 
